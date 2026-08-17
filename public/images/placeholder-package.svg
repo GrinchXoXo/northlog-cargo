@@ -1,0 +1,10 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Package placeholder">
+  <rect width="200" height="200" fill="#eef1ec"/>
+  <g transform="translate(48,52)">
+    <polygon points="52,0 104,26 52,52 0,26" fill="#dfe6df"/>
+    <polygon points="0,26 52,52 52,104 0,78" fill="#c7d2c8"/>
+    <polygon points="104,26 52,52 52,104 104,78" fill="#b7c4b8"/>
+    <line x1="26" y1="13" x2="26" y2="91" stroke="#8b9793" stroke-width="1" stroke-dasharray="3 3"/>
+    <line x1="78" y1="13" x2="78" y2="91" stroke="#8b9793" stroke-width="1" stroke-dasharray="3 3"/>
+  </g>
+</svg>
