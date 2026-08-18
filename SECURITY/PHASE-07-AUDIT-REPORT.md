@@ -19,7 +19,7 @@ INFORMATIONAL.
 
 ## 1. Findings
 
-### 1.1 HIGH — Public tracking page has shown no Estimated Delivery for any shipment created since Phase 3
+### 1.1 HIGH: Public tracking page has shown no Estimated Delivery for any shipment created since Phase 3
 
 **Component:** `get_public_shipment()` (originally `0002`, superseded in
 `0007`)
@@ -63,7 +63,7 @@ blank.
 
 ---
 
-### 1.2 MEDIUM — Internal operator notes were exposed on the public tracking page
+### 1.2 MEDIUM: Internal operator notes were exposed on the public tracking page
 
 **Component:** `get_public_shipment()`
 
@@ -90,7 +90,7 @@ contain it (Section 6.1 has the exact query).
 
 ---
 
-### 1.3 LOW — No security headers configured
+### 1.3 LOW: No security headers configured
 
 **Component:** `next.config.ts`
 
@@ -112,7 +112,7 @@ against the production URL, not as part of this pass.
 
 ---
 
-### 1.4 LOW — No length limit on tracking ID input (public and admin lookup paths)
+### 1.4 LOW: No length limit on tracking ID input (public and admin lookup paths)
 
 **Component:** `TrackingForm.tsx`, `getShipmentByTrackingId.ts`,
 `getShipmentForAdmin.ts`
@@ -132,7 +132,7 @@ found" for anything over that length before it reaches the database.
 
 ---
 
-### 1.5 INFORMATIONAL — `admin_profiles` table is unused
+### 1.5 INFORMATIONAL: `admin_profiles` table is unused
 
 **Finding:** Created in Phase 2 as optional metadata scaffolding
 (`display_name` alongside the Supabase Auth user), RLS correctly
@@ -144,7 +144,7 @@ names somewhere, or leave it, or drop it in a future cleanup pass.
 
 ---
 
-### 1.6 INFORMATIONAL / PROCESS — Telegram bot token exposure
+### 1.6 INFORMATIONAL / PROCESS: Telegram bot token exposure
 
 **Finding:** `TELEGRAM_BOT_TOKEN` was pasted in plaintext into this
 chat conversation multiple times during setup and debugging.

@@ -30,14 +30,22 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files: .env.example is a safe template with no real secrets and
+# should be committed; every other .env* file may contain real
+# credentials and must not be.
 .env*
+!.env.example
 
 # vercel
 .vercel
 
+# cloudflare (OpenNext / Wrangler build output and local secrets)
+.open-next/
+.wrangler/
+.dev.vars
+cloudflare-env.d.ts
+worker-configuration.d.ts
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-!.env.example
