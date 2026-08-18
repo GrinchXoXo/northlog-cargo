@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { trackShipmentAction } from "@/app/tracking/actions";
+import { trackShipmentAction } from "@/app/(site)/tracking/actions";
 import type { TrackingLookupResult } from "@/types/shipment";
 import { TrackingForm } from "./TrackingForm";
 import { LoadingState } from "./LoadingState";
@@ -53,9 +53,6 @@ export function TrackingExperience() {
     <div className="flex flex-col gap-8">
       <div className="rounded-[var(--radius-lg)] border border-hairline bg-surface p-6 sm:p-8">
         <TrackingForm onSubmit={handleSubmit} initialValue={queryId} size="lg" />
-        <p className="mt-3 text-xs text-slate">
-          Try the sample ID <span className="font-data text-ink">NMX-842731</span>.
-        </p>
       </div>
 
       {isLoading && <LoadingState />}
