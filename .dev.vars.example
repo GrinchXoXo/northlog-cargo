@@ -1,0 +1,13 @@
+# Used only by `npm run preview` (opennextjs-cloudflare build + preview),
+# which runs the app in a local Workers runtime to test the actual
+# Cloudflare deployment shape before pushing. `next dev` does not read
+# this file - it reads .env.local instead. Copy this to `.dev.vars` and
+# fill in the same values as your .env.local. Never commit the real file.
+
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_WEBHOOK_SECRET=
+NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=
+NEXT_PUBLIC_SITE_URL=https://northlog.xyz
