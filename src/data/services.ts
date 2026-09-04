@@ -19,21 +19,21 @@ export const SERVICES: Service[] = [
     title: "Freight Forwarding",
     description:
       "We coordinate the movement of your cargo from origin to destination, handling the steps between pickup and final-mile delivery.",
-    coverage: "[SERVICE COVERAGE AREA]",
+    coverage: "Global",
   },
   {
     icon: Warehouse,
     title: "Consolidated Shipping",
     description:
       "Smaller shipments are grouped together to move efficiently, with each package tracked individually under its own ID.",
-    coverage: "[SERVICE COVERAGE AREA]",
+    coverage: "Global",
   },
   {
     icon: PackageCheck,
     title: "Package Handling",
     description:
       "Every shipment is logged, photographed, and checked at key handling points so its condition and status stay on record.",
-    coverage: "[SERVICE COVERAGE AREA]",
+    coverage: "Global",
   },
   {
     icon: ClipboardList,

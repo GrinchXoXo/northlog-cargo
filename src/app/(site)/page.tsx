@@ -71,7 +71,7 @@ export default function HomePage() {
             <div className="overflow-hidden rounded-[var(--radius-lg)] shadow-lg">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/images/hero-cargo.svg"
+                src="/images/hero-cargo.jfif"
                 alt="Illustration of stacked shipping containers with a tracked shipment status card"
                 className="w-full"
               />

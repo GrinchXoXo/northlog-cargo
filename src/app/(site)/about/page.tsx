@@ -43,15 +43,15 @@ export default function AboutPage() {
               a status history, and a last known location: from the moment
               a package is received to the moment it&apos;s delivered.
             </p>
-            <p className="mt-4 text-base leading-relaxed text-slate">
+            {/* <p className="mt-4 text-base leading-relaxed text-slate">
               [COMPANY BACKGROUND: add founding story, operational
               history, and coverage details once confirmed.]
-            </p>
+            </p> */}
           </div>
           <div className="overflow-hidden rounded-[var(--radius-lg)] border border-hairline">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/images/about-cover.svg"
+              src="/images/about-cover.jfif"
               alt="Illustration of a freight yard with cranes and stacked containers"
               className="w-full"
             />
@@ -84,8 +84,8 @@ export default function AboutPage() {
       <Section className="bg-surface border-t border-hairline">
         <SectionHeading eyebrow="Where We Operate" title="Operational coverage" />
         <p className="mt-4 max-w-2xl text-base leading-relaxed text-slate">
-          [OPERATIONAL COVERAGE: list confirmed origin/destination regions
-          and service areas once supplied by the company.]
+          We provide logistics and cargo services across global markets, connecting origins and destinations through reliable international transportation and supply-chain solutions.
+
         </p>
       </Section>
     </>
