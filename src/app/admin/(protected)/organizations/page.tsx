@@ -49,6 +49,9 @@ export default async function OrganizationsPage() {
                   <th className="px-5 py-3 font-medium">Slug</th>
                   <th className="px-5 py-3 font-medium">Created</th>
                   <th className="px-5 py-3 text-right font-medium">Members</th>
+                  <th className="px-5 py-3 text-right font-medium">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -74,6 +77,14 @@ export default async function OrganizationsPage() {
                         <Users size={14} className="text-slate-light" strokeWidth={2} />
                         {org.memberCount}
                       </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <Link
+                        href={`/admin/organizations/${org.id}`}
+                        className="text-sm font-medium text-cargo hover:text-cargo-hover"
+                      >
+                        Open
+                      </Link>
                     </td>
                   </tr>
                 ))}

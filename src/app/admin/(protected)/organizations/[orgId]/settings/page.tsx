@@ -6,6 +6,6 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function SettingsPage() {
+export default function OrgContextSettingsPage() {
   return <SettingsView />;
 }

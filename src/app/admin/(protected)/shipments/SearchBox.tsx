@@ -4,14 +4,14 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 
-export function SearchBox({ initialValue = "" }: { initialValue?: string }) {
+export function SearchBox({ initialValue = "", basePath = "/admin/shipments" }: { initialValue?: string; basePath?: string }) {
   const router = useRouter();
   const [value, setValue] = useState(initialValue);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const trimmed = value.trim();
-    router.push(trimmed ? `/admin/shipments?q=${encodeURIComponent(trimmed)}` : "/admin/shipments");
+    router.push(trimmed ? `${basePath}?q=${encodeURIComponent(trimmed)}` : basePath);
   }
 
   return (

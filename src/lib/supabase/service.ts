@@ -3,17 +3,25 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 /**
  * Service-role Supabase client. Bypasses RLS entirely.
  *
- * Used by exactly one request path: organization provisioning
- * (src/lib/organizations/provision.ts), which needs to create a
- * Supabase Auth user and look one up by email — neither of which the
- * cookie-authenticated client may do. Everything it touches there is
- * explicitly authorized first by is_platform_owner().
+ * Used by exactly two request paths, both platform-owner only:
  *
- * Because it bypasses RLS it also bypasses the organization boundary,
- * so any caller must resolve the organization itself and check
- * membership before touching rows — never rely on this client to
- * enforce tenant isolation. It must never be used to read business
- * data (shipments, conversations, messages) for the dashboard.
+ *   1. organization provisioning (src/lib/organizations/provision.ts),
+ *      which needs to create a Supabase Auth user and look one up by
+ *      email — neither of which the cookie-authenticated client may do.
+ *   2. organization-context inspection reads
+ *      (src/lib/platform/orgData.ts), which re-verifies
+ *      `is_platform_owner()` on every call and scopes every query to a
+ *      single resolved `organization_id` — that module exists because
+ *      the platform operator is deliberately not a member of each
+ *      tenant, so RLS (correctly) shows their session nothing.
+ *
+ * Everything either path touches is explicitly authorized first by
+ * is_platform_owner(). Because it bypasses RLS it also bypasses the
+ * organization boundary, so any caller must resolve the organization
+ * itself and check authorization before touching rows — never rely on
+ * this client to enforce tenant isolation. It must never be used to
+ * read business data for the ordinary dashboard (the organization
+ * admin's session + RLS remains the only path there).
  *
  * NEVER import this from a Client Component or anything that could end
  * up in a browser bundle. It is only safe in Route Handlers / server-

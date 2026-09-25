@@ -16,6 +16,14 @@ const BASE_NAV = [
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
+/**
+ * `/admin/organizations/<uuid>/...` — the platform owner's
+ * organization-context routes. The org-admin never has
+ * `showOrganizations`, so this match can only ever apply to the
+ * platform operator.
+ */
+const ORG_CONTEXT_RE = /^\/admin\/organizations\/([0-9a-fA-F-]{36})(\/|$)/;
+
 export function AdminHeader({
   userEmail,
   showOrganizations = false,
@@ -26,9 +34,38 @@ export function AdminHeader({
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  const NAV = showOrganizations
-    ? [...BASE_NAV, { href: "/admin/organizations", label: "Organizations", icon: Building2 }]
-    : BASE_NAV;
+  const contextMatch = showOrganizations ? pathname.match(ORG_CONTEXT_RE) : null;
+  const contextBase = contextMatch ? `/admin/organizations/${contextMatch[1]}` : null;
+
+  // Three navigation shapes:
+  //   1. Platform owner inside an organization context — that
+  //      organization's operational navigation, under its own routes.
+  //   2. Platform owner at platform level — Dashboard + Organizations
+  //      only; no organization-admin navigation as primary nav.
+  //   3. Organization admin — the existing dashboard navigation,
+  //      unchanged.
+  const NAV = contextBase
+    ? [
+        { href: contextBase, label: "Dashboard", icon: LayoutDashboard },
+        { href: `${contextBase}/shipments`, label: "Shipments", icon: Package },
+        { href: `${contextBase}/support`, label: "Support", icon: MessageCircle },
+        { href: `${contextBase}/settings`, label: "Settings", icon: Settings },
+      ]
+    : showOrganizations
+      ? [
+          { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+          { href: "/admin/organizations", label: "Organizations", icon: Building2 },
+        ]
+      : BASE_NAV;
+
+  const isActive = (href: string) => {
+    if (!contextBase) {
+      return pathname === href;
+    }
+    // Inside a context, the context root only lights up for itself;
+    // every other item also covers its detail subroutes.
+    return href === contextBase ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+  };
 
   return (
     <header className="sticky top-0 z-50 border-b border-hairline bg-surface">
@@ -47,7 +84,7 @@ export function AdminHeader({
         <nav className="hidden md:flex items-center gap-1" aria-label="Admin">
           {NAV.map((item) => {
             const Icon = item.icon;
-            const active = pathname === item.href;
+            const active = isActive(item.href);
             return (
               <Link
                 key={item.href}
@@ -85,7 +122,7 @@ export function AdminHeader({
           <Container className="flex flex-col gap-1 py-4">
             {NAV.map((item) => {
               const Icon = item.icon;
-              const active = pathname === item.href;
+              const active = isActive(item.href);
               return (
                 <Link
                   key={item.href}

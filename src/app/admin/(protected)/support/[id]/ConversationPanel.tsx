@@ -21,7 +21,14 @@ function formatTime(iso: string) {
   });
 }
 
-export function ConversationPanel({ conversation }: { conversation: AdminConversationDetail }) {
+export function ConversationPanel({
+  conversation,
+  readOnly = false,
+}: {
+  conversation: AdminConversationDetail;
+  /** Platform-owner inspection mode: messages visible, no reply composer, no lifecycle actions. */
+  readOnly?: boolean;
+}) {
   const router = useRouter();
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -65,6 +72,7 @@ export function ConversationPanel({ conversation }: { conversation: AdminConvers
           <p className="mt-1 text-xs text-slate">Status: {conversation.status}</p>
         </div>
 
+        {!readOnly && (
         <div className="flex flex-wrap gap-2">
           {conversation.status === "OPEN" && (
             <button
@@ -105,6 +113,7 @@ export function ConversationPanel({ conversation }: { conversation: AdminConvers
             Delete
           </button>
         </div>
+        )}
       </div>
 
       <div className="mt-6 flex flex-col gap-3 rounded-[var(--radius-lg)] border border-hairline bg-surface p-4">
@@ -132,7 +141,7 @@ export function ConversationPanel({ conversation }: { conversation: AdminConvers
         ))}
       </div>
 
-      {conversation.status !== "ARCHIVED" && (
+      {!readOnly && conversation.status !== "ARCHIVED" && (
         <form onSubmit={handleSend} className="mt-4 flex gap-2">
           <input
             value={body}
@@ -148,6 +157,13 @@ export function ConversationPanel({ conversation }: { conversation: AdminConvers
             <Send size={16} />
           </button>
         </form>
+      )}
+
+      {readOnly && (
+        <p className="mt-4 text-xs text-slate-light">
+          Read-only platform view — replies and status changes are made by this
+          organization&apos;s administrators.
+        </p>
       )}
 
       {error && <p className="mt-3 text-sm text-danger">{error}</p>}
