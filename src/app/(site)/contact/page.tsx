@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Mail, Send } from "lucide-react";
+import { Mail } from "lucide-react";
 import { Section } from "@/components/ui/Section";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ContactForm } from "@/components/sections/ContactForm";
@@ -7,18 +7,11 @@ import { CONTACT, SITE_NAME } from "@/lib/constants";
 
 export const metadata: Metadata = {
   title: "Contact",
-  description: `Get in touch with ${SITE_NAME} by email, Telegram, or the contact form.`,
+  description: `Get in touch with ${SITE_NAME} by email or the contact form.`,
 };
 
 const DETAILS = [
   { icon: Mail, label: "Email", value: CONTACT.email, href: CONTACT.emailHref, external: false },
-  {
-    icon: Send,
-    label: "Telegram",
-    value: CONTACT.telegramLabel,
-    href: CONTACT.telegramHref,
-    external: true,
-  },
 ];
 
 export default function ContactPage() {
@@ -27,7 +20,7 @@ export default function ContactPage() {
       <SectionHeading
         eyebrow="Contact"
         title="Get in touch"
-        description="Need help with a shipment? Reach us by email or Telegram, or send a message below."
+        description="Need help with a shipment? Reach us by email, or send a message below."
       />
 
       <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-5">

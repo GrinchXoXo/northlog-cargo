@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Menu, X, Package, LayoutDashboard, PackagePlus, Settings, MessageCircle } from "lucide-react";
+import { Menu, X, Package, LayoutDashboard, PackagePlus, Settings, MessageCircle, Building2 } from "lucide-react";
 import { Container } from "@/components/ui/Container";
 import { SITE_SHORT_NAME } from "@/lib/constants";
 import { SignOutButton } from "./SignOutButton";
 
-const NAV = [
+const BASE_NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/shipments", label: "Shipments", icon: Package },
   { href: "/admin/shipments/new", label: "Create Shipment", icon: PackagePlus },
@@ -16,9 +16,19 @@ const NAV = [
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
-export function AdminHeader({ userEmail }: { userEmail: string }) {
+export function AdminHeader({
+  userEmail,
+  showOrganizations = false,
+}: {
+  userEmail: string;
+  showOrganizations?: boolean;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  const NAV = showOrganizations
+    ? [...BASE_NAV, { href: "/admin/organizations", label: "Organizations", icon: Building2 }]
+    : BASE_NAV;
 
   return (
     <header className="sticky top-0 z-50 border-b border-hairline bg-surface">

@@ -12,6 +12,16 @@
 
 # 1. Executive Summary
 
+> **Iteration 1 notice.** The Telegram operations bot (component 4
+> below, sections 19–21, "Phase 4", and every Telegram mention in the
+> phased documents) was removed from the application in Iteration 1,
+> together with the introduction of the `organizations` /
+> `organization_members` foundation for serving more than one
+> customer. Those sections are retained as history and no longer
+> describe shipped behaviour. `PRD/PHASE-04-TELEGRAM-BOT.md` was
+> deleted with the feature; `SECURITY/PHASE-07-AUDIT-REPORT.md` remains
+> a record of a past audit.
+
 The product is a digital platform for a small logistics/shipping company.
 
 The platform consists of four interconnected components:
@@ -1246,8 +1256,7 @@ phases/
 │
 ├── PHASE-01-PUBLIC-WEBSITE.md
 ├── PHASE-02-BACKEND.md
-├── PHASE-03-ADMIN-DASHBOARD.md
-└── PHASE-04-TELEGRAM-BOT.md
+└── PHASE-03-ADMIN-DASHBOARD.md
 ```
 
 The **Master PRD** defines:

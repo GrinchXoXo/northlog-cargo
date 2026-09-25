@@ -1,13 +1,19 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 /**
- * Service-role Supabase client. Bypasses RLS entirely: this is the
- * first and only place in the app that uses it, and it exists solely
- * because the Telegram webhook has no browser session to authenticate
- * with (Telegram's servers call ours directly). Authorization for every
- * write made with this client is enforced in application code (verify
- * the Telegram user maps to an active admin in telegram_accounts)
- * before any shipment operation runs.
+ * Service-role Supabase client. Bypasses RLS entirely.
+ *
+ * Used by exactly one request path: organization provisioning
+ * (src/lib/organizations/provision.ts), which needs to create a
+ * Supabase Auth user and look one up by email — neither of which the
+ * cookie-authenticated client may do. Everything it touches there is
+ * explicitly authorized first by is_platform_owner().
+ *
+ * Because it bypasses RLS it also bypasses the organization boundary,
+ * so any caller must resolve the organization itself and check
+ * membership before touching rows — never rely on this client to
+ * enforce tenant isolation. It must never be used to read business
+ * data (shipments, conversations, messages) for the dashboard.
  *
  * NEVER import this from a Client Component or anything that could end
  * up in a browser bundle. It is only safe in Route Handlers / server-

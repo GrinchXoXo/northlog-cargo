@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { mapShipmentRow, mapTrackingEventRow, type RawShipmentRow, type RawTrackingEventRow } from "./mapRows";
 import type { AdminShipment, AdminTrackingEvent } from "@/types/shipment";
-import type { ShipmentActionContext } from "./context";
 
 export type GetShipmentForAdminResult =
   | { state: "success"; shipment: AdminShipment; events: AdminTrackingEvent[] }
@@ -11,29 +10,23 @@ export type GetShipmentForAdminResult =
 
 /**
  * Fetches the full internal record for one shipment (by tracking ID) for
- * the admin detail page (and the Telegram /track command), including the
- * complete event history: unlike the public contract, nothing here is
- * filtered. Accepts an optional bot context; without one it uses the
- * caller's browser session as before.
+ * the admin detail page, including the complete event history: unlike the
+ * public contract, nothing here is filtered. Requires an authenticated
+ * session; RLS scopes the rows to the caller's organization.
  */
-export async function getShipmentForAdmin(
-  trackingId: string,
-  ctx?: Pick<ShipmentActionContext, "client">
-): Promise<GetShipmentForAdminResult> {
+export async function getShipmentForAdmin(trackingId: string): Promise<GetShipmentForAdminResult> {
   if (trackingId.trim().length === 0 || trackingId.length > 64) {
     return { state: "not_found" };
   }
 
-  const supabase = ctx ? ctx.client : await createClient();
+  const supabase = await createClient();
 
-  if (!ctx) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-    if (!user) {
-      return { state: "unauthorized" };
-    }
+  if (!user) {
+    return { state: "unauthorized" };
   }
 
   const { data: shipmentRow, error: shipmentError } = await supabase

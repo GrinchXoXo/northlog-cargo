@@ -1,12 +1,11 @@
 import type { ShipmentStatus } from "@/types/shipment";
 import { STATUS_LABELS } from "@/types/shipment";
+import { ValidationError } from "./error";
 
-export class ValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ValidationError";
-  }
-}
+// Re-exported so existing importers keep a single import site; the
+// class itself now lives in ./error so other validators (organization
+// provisioning) can share it.
+export { ValidationError };
 
 function requireNonEmptyString(value: unknown, field: string): string {
   if (typeof value !== "string" || value.trim().length === 0) {

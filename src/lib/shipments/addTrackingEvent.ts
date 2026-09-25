@@ -1,21 +1,18 @@
 import { createClient } from "@/lib/supabase/server";
 import { validateStatusUpdateInput, ValidationError } from "@/lib/validation/shipment";
-import type { ShipmentActionContext } from "./context";
 
 export type AddTrackingEventResult = { ok: true } | { ok: false; error: string };
 
 /**
  * Inserts a new tracking event and updates the shipment's current
  * status, location, ETA, and customs-action fields atomically via
- * add_tracking_event() (supabase/migrations/0007, widened in 0009).
- * Historical events are never overwritten: see PRD section 11/14.
- * Requires an authenticated admin: either the caller's browser session
- * (default) or a pre-authorized bot context (see lib/shipments/context.ts).
+ * add_tracking_event() (supabase/migrations/0007, superseded from 0009
+ * on). Historical events are never overwritten: see PRD section 11/14.
+ * Requires an authenticated admin: the function is SECURITY INVOKER, so
+ * the caller's organization membership decides which shipment may be
+ * touched.
  */
-export async function addTrackingEvent(
-  input: unknown,
-  ctx?: ShipmentActionContext
-): Promise<AddTrackingEventResult> {
+export async function addTrackingEvent(input: unknown): Promise<AddTrackingEventResult> {
   let validated;
   try {
     validated = validateStatusUpdateInput(input);
@@ -26,16 +23,14 @@ export async function addTrackingEvent(
     throw err;
   }
 
-  const supabase = ctx ? ctx.client : await createClient();
+  const supabase = await createClient();
 
-  if (!ctx) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-    if (!user) {
-      return { ok: false, error: "Authentication required." };
-    }
+  if (!user) {
+    return { ok: false, error: "Authentication required." };
   }
 
   const { error } = await supabase.rpc("add_tracking_event", {
@@ -50,7 +45,6 @@ export async function addTrackingEvent(
     p_clear_estimated_delivery: validated.clearEstimatedDelivery,
     p_requires_action: validated.requiresAction,
     p_action_message: validated.actionMessage,
-    p_actor_id: ctx ? ctx.actorId : null,
   });
 
   if (error) {

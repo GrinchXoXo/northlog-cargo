@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { validateCreateShipmentInput, ValidationError } from "@/lib/validation/shipment";
-import type { ShipmentActionContext } from "./context";
 
 export type CreateShipmentResult =
   | { ok: true; trackingId: string; shipmentId: string }
@@ -8,15 +7,12 @@ export type CreateShipmentResult =
 
 /**
  * Creates a shipment and its initial tracking event atomically via the
- * create_shipment_with_event() RPC (supabase/migrations/0003, widened in
- * 0009). Requires an authenticated admin: either the caller's browser
- * session (default) or a pre-authorized bot context (see
- * lib/shipments/context.ts).
+ * create_shipment_with_event() RPC (supabase/migrations/0003, superseded
+ * in 0007/0009, organization-aware in 0014). Requires an authenticated
+ * admin: the function is SECURITY INVOKER, so both the write and the
+ * organization it is filed under come from the caller's session.
  */
-export async function createShipment(
-  input: unknown,
-  ctx?: ShipmentActionContext
-): Promise<CreateShipmentResult> {
+export async function createShipment(input: unknown): Promise<CreateShipmentResult> {
   let validated;
   try {
     validated = validateCreateShipmentInput(input);
@@ -27,16 +23,14 @@ export async function createShipment(
     throw err;
   }
 
-  const supabase = ctx ? ctx.client : await createClient();
+  const supabase = await createClient();
 
-  if (!ctx) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-    if (!user) {
-      return { ok: false, error: "Authentication required." };
-    }
+  if (!user) {
+    return { ok: false, error: "Authentication required." };
   }
 
   const { data, error } = await supabase
@@ -48,7 +42,6 @@ export async function createShipment(
       p_estimated_delivery_at: validated.estimatedDeliveryAt,
       p_product_image_path: validated.productImagePath,
       p_initial_location: validated.initialLocation,
-      p_actor_id: ctx ? ctx.actorId : null,
     })
     .single();
 

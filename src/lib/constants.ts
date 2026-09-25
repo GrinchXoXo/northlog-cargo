@@ -17,8 +17,6 @@ export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://northlog.xy
 export const CONTACT = {
   email: "support@northlog.xyz",
   emailHref: "mailto:support@northlog.xyz",
-  telegramLabel: "Northlog Support",
-  telegramHref: "https://t.me/NorthlogSupport",
 };
 
 export const NAV_LINKS = [

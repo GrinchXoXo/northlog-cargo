@@ -5,8 +5,10 @@ import { getSupabaseEnv } from "./env";
 /**
  * Server-side Supabase client for use in Server Components, Route
  * Handlers, and Server Actions. Reads/writes the auth session via
- * cookies so admin writes are authorized as the signed-in user: this
- * project has no service-role key in application code, by design.
+ * cookies so admin writes are authorized as the signed-in user. This
+ * is the client every dashboard page uses; the service-role key
+ * (./service.ts) is only reached by organization provisioning, which
+ * has no browser session of its own to work with.
  */
 export async function createClient() {
   const cookieStore = await cookies();

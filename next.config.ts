@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
         // headers with essentially no risk of breaking functionality.
         // A Content-Security-Policy is deliberately not included here:
         // getting one right requires testing against the real deployed
-        // app (Supabase origins, Telegram, etc.) which hasn't been
+        // app (Supabase origins, etc.) which hasn't been
         // possible from this build environment. See Phase 7 audit notes.
         source: "/:path*",
         headers: [

@@ -1,15 +1,33 @@
 # Northlog Cargo
 
 Logistics company website, shipment tracking, admin dashboard, and
-Telegram operations bot, built per the documents in `PRD/`.
+customer support chat, built per the documents in `PRD/`.
 
 ## Current phase
 
 **Phase 7, Security Hardening, complete.** Phase 6 (production launch)
 is in progress: the Cloudflare Workers deployment path is set up and
 verified to build correctly (see "Deploying to production" below), but
-the actual live domain, hosted webhook, and business email are being
-finished outside this repository.
+the actual live domain and business email are being finished outside
+this repository.
+
+**Iteration 1:** the Telegram integration has been removed, and
+migration `0014` introduces the organization (organization_id)
+foundation so Northlog can eventually serve more than one logistics
+company — without touching the existing client's data.
+
+**Iteration 2 (this state of the repo):** migration `0015` adds an
+explicit platform-operator designation and the provisioning RPCs, and
+the dashboard gains an internal `/admin/organizations` page where that
+operator creates a new company together with its first admin. Tenant
+isolation between two organizations is verified in the database.
+See "Organizations" and "Removed: Telegram" below.
+
+**Iteration 2.1:** a security review of Iterations 1–2, fixed by
+migration `0016` — `pg_temp` search-path pinning on every
+security-relevant function, a tenant check on private (general) chat
+conversations, and storage writes scoped to the owning organization.
+See "Security review (Iteration 2.1)" below.
 
 ## Stack
 
@@ -17,7 +35,6 @@ finished outside this repository.
 - Tailwind CSS v4
 - Lucide React icons
 - Supabase (Postgres, Auth, Storage)
-- Telegram Bot API (webhook based, plain `fetch`, no bot framework)
 - Cloudflare Workers via the OpenNext adapter (`@opennextjs/cloudflare`)
   for production hosting
 
@@ -52,37 +69,53 @@ supabase/migrations/0007_phase3_schema_and_functions.sql
 supabase/migrations/0008_phase3_seed.sql
 supabase/migrations/0009_widen_write_rpcs_for_bot.sql
 supabase/migrations/0010_telegram_linking.sql
+supabase/migrations/0011_fix_public_eta_and_notes.sql
+supabase/migrations/0012_chat_support.sql
+supabase/migrations/0013_chat_admin_rpcs.sql
+supabase/migrations/0014_organizations_tenancy.sql
+supabase/migrations/0015_platform_owner_provisioning.sql
+supabase/migrations/0016_tenant_isolation_hardening.sql
 ```
 
 `0006` adds a new value to the `shipment_status` enum. Postgres will not
 let you reference it in the same transaction that added it, so run it
 by itself first, then the rest.
 
+Migrations are never edited once applied. `0014` is written to be safe
+to run against the existing production database: it only creates,
+backfills and re-scopes — it does not drop tables, truncate anything,
+or touch Supabase Auth. `0015` is written the same way: it adds one
+column with a default and a partial unique index, backfills a small
+list table, and re-defines two functions — it drops nothing. `0016`
+only pins function configuration, replaces chat function bodies with
+an added authorization check, and replaces three storage policies with
+narrower ones — it drops no tables, columns or rows, and leaves public
+image reads untouched. All three files are idempotent (re-running them
+changes nothing).
+
 ### 4. Create an admin user
 
-Authentication, Users, Add User, in the Supabase dashboard.
+Authentication, Users, Add User, in the Supabase dashboard, then add
+the user to an organization (see "Organizations" below):
 
-### 5. Set up the Telegram bot
+```sql
+insert into organization_members (organization_id, user_id, role)
+select o.id, u.id, 'OWNER'
+from organizations o
+join auth.users u on u.email = 'admin@example.com'
+where o.slug = 'northlog-cargo';
+```
 
-1. Message `@BotFather` in Telegram, `/newbot`, save the token as
-   `TELEGRAM_BOT_TOKEN`.
-2. Generate a random secret (`openssl rand -hex 32`) as
-   `TELEGRAM_WEBHOOK_SECRET`.
-3. Set `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` to your bot's username, no
-   `@`.
-4. Get a public HTTPS URL for the webhook. Telegram cannot reach
-   `localhost`. Use your deployed URL, or a tunnel for local testing
-   (`cloudflared tunnel --url http://localhost:3000` or
-   `ngrok http 3000`).
-5. Register the webhook:
+A user with no `organization_members` row can sign in but sees an empty
+dashboard: every query is filtered by organization membership.
 
-   ```bash
-   curl -X POST https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook \
-     -d url=https://<your-domain>/api/telegram/webhook \
-     -d secret_token=<TELEGRAM_WEBHOOK_SECRET>
-   ```
+Once `0015` is applied, later companies are created from the dashboard
+by the platform operator: sign in, open **Organizations**, enter the
+company name, its slug and the first admin's email address. The admin
+account is created for them together with a one-time password (shown
+once), so the SQL above is only for bootstrapping that first user.
 
-### 6. Run the app
+### 5. Run the app
 
 ```bash
 npm run dev
@@ -92,23 +125,174 @@ npm run dev
 - Admin dashboard: `http://localhost:3000/admin/login`
 - Tracking IDs to try: `NMX-842731` (in transit), `NMX-113305` (delivered)
 
-To connect Telegram: sign into the dashboard, go to Settings, tap
-Connect Telegram, tap the generated link, confirm in Telegram. Then try
-`/create`, `/track`, `/update` in the bot.
-
 ```bash
 npm run lint
 npm run build
 ```
 
+## Organizations
+
+Northlog is being prepared to host several independent logistics
+companies. Iteration 1 establishes only the foundation:
+
+```
+organizations            one row per Northlog customer
+organization_members     which auth user belongs to which organization (OWNER | ADMIN)
+
+shipments.organization_id      the tenant root
+conversations.organization_id  needed because general conversations have no shipment
+
+tracking_events  -> tenant via their shipment
+messages         -> tenant via their conversation
+```
+
+- The existing client was backfilled into the organization
+  `northlog-cargo` ("Northlog Cargo") along with every existing
+  shipment, conversation, and pre-existing auth user. No data was
+  deleted, recreated, or moved.
+- Row-level security on `shipments`, `tracking_events`, `conversations`
+  and `messages` now resolves the caller's organization with
+  `auth_organization_id()`. The organization ID is never taken from the
+  browser — membership decides it.
+- Both new tables are RLS-enabled. `organizations` is readable only by
+  its members and `organization_members` only by the user concerned;
+  neither has an INSERT/UPDATE/DELETE policy for `authenticated`, so
+  membership is changed as the SQL editor or the service role, never
+  from the browser.
+- Public tracking and the public/customer chat still run through the
+  same SECURITY DEFINER functions as before, so anonymous visitors are
+  unaffected.
+- Exactly one organization carries `is_default = true` (enforced by a
+  partial unique index). That is the company the public website belongs
+  to, and `default_organization_id()` files the site's general —
+  non-shipment — support conversations under it. Iteration 1's
+  "only while a single organization exists" guard would have broken
+  public chat the moment a second company was provisioned, so `0015`
+  replaced it with this explicit designation.
+
+### Provisioning (Iteration 2)
+
+`/admin/organizations` is an internal page for the **platform
+operator** — the one person who may create companies. A customer admin
+never sees it and cannot use what is behind it.
+
+```
+operator → company name + slug + admin email
+        → Supabase Auth user created or found (server-side, service role)
+        → create_organization_with_admin() inserts organization + OWNER membership in one transaction
+        → that admin signs in at /admin and sees only their own organization
+```
+
+- **Who is the operator:** the `platform_owners` table (migration
+  `0015`), a list of auth user IDs with RLS enabled and *zero* policies,
+  so no browser role can read or write it. `is_platform_owner()` is a
+  no-argument SECURITY DEFINER function that answers only about
+  `auth.uid()`. The migration backfills the earliest pre-existing auth
+  account (that account already had unrestricted access in Iteration 1).
+  To name someone else:
+
+  ```sql
+  delete from platform_owners;
+  insert into platform_owners (user_id)
+  select id from auth.users where email = 'you@example.com';
+  ```
+
+- **Where authorization is enforced:** in three places, none of them the
+  navigation. The page checks it before rendering, the server action
+  checks it before doing anything, and
+  `create_organization_with_admin()` / `list_organizations()` re-check it
+  as their first statement — so calling the function directly through
+  PostgREST gets the same refusal.
+
+- **Auth users:** created with the service-role key, strictly inside
+  the server action (`src/lib/organizations/provision.ts`). The key is
+  read from `SUPABASE_SERVICE_ROLE_KEY`, never sent to the browser and
+  never `NEXT_PUBLIC_`. A one-time password is generated with the
+  platform CSPRNG and shown to the operator once; nothing is stored.
+
+- **Partial failure is reported, never hidden:** the Auth user is
+  created first on purpose. If the organization transaction then fails,
+  the response says the user exists but the organization does not and
+  that retrying will reuse them — an orphaned Auth user is inert, while
+  an organization with no admin would claim a slug and lie about
+  success.
+
+- **Multi-org behavior of the public site:** general support chat keeps
+  filing under the default organization; shipment chat is derived from
+  the shipment, so it is correct for every organization automatically.
+
+Not built in this iteration: public signup, customer-facing onboarding,
+invitations, organization switching, billing, subscriptions, tenant
+branding, tenant analytics, advanced RBAC, an organization settings UI,
+or any change to the login flow.
+
+### Security review (Iteration 2.1)
+
+Reviewed Iterations 1–2 against the database itself, not against the
+passing test output. Three issues were verified and fixed by `0016`:
+
+- **`pg_temp` search-path shadowing.** `set search_path = public`
+  still searches the temporary schema first, so a caller able to run
+  SQL could create a TEMP table that shadows a real one inside a
+  SECURITY DEFINER function — verified: `is_platform_owner()` returned
+  `true` for a non-owner when `platform_owners` was shadowed. Every
+  security-relevant function now runs with `search_path = public,
+  pg_temp` (temporary objects last), and 0014's policies reference
+  their tables schema-qualified.
+
+- **Chat conversations readable by UUID across tenants.**
+  `get_conversation_json()`, `send_customer_message()` and
+  `get_or_create_general_conversation()` are SECURITY DEFINER, so RLS
+  never saw the request: direct table reads said no, the RPC said yes.
+  General conversations are the only private kind, so they now carry a
+  tenant check for signed-in callers — a member of another
+  organization gets the same "Conversation not found." a missing
+  conversation produces, and a refused send writes nothing. Shipment
+  conversations stay reachable by tracking ID (the public tracking
+  page contract from 0012), and the conversation UUID remains the
+  credential for anonymous visitors.
+
+- **Storage writes were not tenant-scoped.** The `0004` policies let
+  any authenticated user upload, overwrite or delete any object in
+  the public `shipment-images` bucket, and image paths are served by
+  `get_public_shipment()` — a defacement path. Uploads now require an
+  organization membership; overwriting or deleting an object further
+  requires that it be referenced by a shipment of the caller's
+  organization. Public reads (PRD §26) and the app's upload flow
+  (fresh random UUID path, `upsert: false`) are unchanged.
+
+Verified in the database harness (208 checks): every organization,
+shipment, tracking event, conversation, message and storage object of
+one organization stays invisible and unmodifiable from the other, a
+user with no organization sees an empty database, platform-owner
+functions refuse customers and `platform_owners` has no browser
+write path, pre-existing data (tracking IDs, conversations, auth
+users) is untouched, and re-running 0014–0016 changes nothing.
+
+Known and deliberately left alone: the historical Telegram tables
+from `0010`, the invoker-only token functions that go with them, and
+admin RPCs that report success when they matched no row (a data
+integrity wart, not an isolation hole).
+
+## Removed: Telegram
+
+The Telegram bot, webhook route, account linking, session state,
+settings UI and `TELEGRAM_*` environment variables have been removed
+from the application. Historical migrations (`0009`, `0010`) are kept
+exactly as they were applied, so the `telegram_link_tokens`,
+`telegram_accounts` and `telegram_sessions` tables remain in the
+database with RLS enabled and are simply no longer referenced by any
+code path. Dropping them is optional cleanup, deliberately kept out of
+`0014`; do it as its own reviewed migration if you want it gone.
+
 ## Deploying to production (Cloudflare Workers)
 
-This app uses Server Actions, middleware, and a dynamic API route (the
-Telegram webhook), so it needs the full Next.js runtime, not a static
-export. Cloudflare's current recommendation for this is the OpenNext
-adapter deploying to Cloudflare Workers, not plain Cloudflare Pages
-(their older Pages/Edge-runtime path doesn't fully support Server
-Actions). This repo is already configured for it: `open-next.config.ts`,
+This app uses Server Actions and middleware, so it needs the full
+Next.js runtime, not a static export. Cloudflare's current
+recommendation for this is the OpenNext adapter deploying to
+Cloudflare Workers, not plain Cloudflare Pages (their older
+Pages/Edge-runtime path doesn't fully support Server Actions). This
+repo is already configured for it: `open-next.config.ts`,
 `wrangler.jsonc`, and the `preview`/`deploy` scripts in `package.json`.
 
 One deliberate, currently-necessary quirk: the session-refresh
@@ -168,43 +352,29 @@ to be set as actual Cloudflare secrets:
 
 ```bash
 npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-npx wrangler secret put TELEGRAM_BOT_TOKEN
-npx wrangler secret put TELEGRAM_WEBHOOK_SECRET
 ```
 
-Each prompts for the value. Re-run any of these any time a secret is
-rotated (e.g. after regenerating the Telegram bot token).
+Each prompts for the value. Re-run any time the secret is rotated.
 
 ### 6. Attach the custom domain to the Worker
 
 Cloudflare dashboard: Workers & Pages, `northlog-cargo`, Settings,
 Domains & Routes, Add Custom Domain, `northlog.xyz`.
 
-### 7. Register the Telegram webhook against the real domain
-
-One-time, unlike the tunnel URL used during development, this stays
-registered indefinitely:
-
-```bash
-curl.exe -X POST https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook -d url=https://northlog.xyz/api/telegram/webhook -d secret_token=<TELEGRAM_WEBHOOK_SECRET>
-```
-
-Verify with `https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo`.
-
-### 8. Business email (Zoho Mail)
+### 7. Business email (Zoho Mail)
 
 Add Zoho's MX, SPF, DKIM, and DMARC records in Cloudflare's DNS panel
 for `northlog.xyz`. The exact values come from Zoho's own
 domain-verification flow when adding the domain there; there's nothing
 to hardcode here.
 
-### 9. Smoke test
+### 8. Smoke test
 
 - `https://northlog.xyz` loads over HTTPS, no certificate warnings
 - `/tracking` with a real tracking ID
-- `/admin/login` signs in
-- `/start` in Telegram against the production bot, `/create`, confirm
-  the new shipment shows up on the live tracking page
+- `/admin/login` signs in, dashboard lists shipments
+- a logged-in admin can create a shipment and post a status update
+- the public chat widget can start a conversation and reply
 
 ### Local preview against the Workers runtime (optional)
 
@@ -223,57 +393,62 @@ supabase/migrations/    Run these in order against your Supabase project
 src/
 ├── app/
 │   ├── admin/(protected)/
-│   │   ├── settings/         Connect and disconnect Telegram
+│   │   ├── settings/         Account settings (no configurable options yet)
 │   │   ├── shipments/        List, create, detail and update
+│   │   ├── support/          Support inbox
+│   │   ├── organizations/    Platform-operator-only provisioning page
 │   │   ├── AdminHeader.tsx   Nav, collapses to a mobile menu below md
-│   │   └── layout.tsx        Auth guard
+│   │   └── layout.tsx        Auth guard + operator nav flag
 │   ├── admin/login/
-│   ├── api/telegram/webhook/ Telegram Bot API entry point
 │   ├── privacy/, terms/      Simple legal pages
 │   ├── tracking/actions.ts   Server Action bridge to the data access layer
-│   └── ...                    about, services, contact, home
+│   └── ...                    about, services, contact, chat, home
 ├── components/
 ├── lib/
 │   ├── supabase/
 │   │   ├── client.ts, server.ts   Cookie authenticated (dashboard)
-│   │   ├── service.ts             Service role (Telegram webhook only)
+│   │   ├── service.ts             Service role (organization provisioning only)
 │   │   └── middleware.ts          Session refresh, scoped to /admin
-│   ├── shipments/          createShipment, addTrackingEvent, and so on.
-│   │                          Shared by the dashboard and the bot via an
-│   │                          optional injected client and actor context
-│   ├── telegram/
-│   │   ├── api.ts              Telegram Bot API, fetch based
-│   │   ├── dispatcher.ts       Routes incoming updates
-│   │   ├── commands/           /create, /track, /update flows
-│   │   ├── session.ts          Durable conversation state in Postgres
-│   │   ├── linking.ts          Account linking and authorization
-│   │   └── image.ts            Telegram photo to Supabase Storage
-│   └── validation/
-└── types/shipment.ts       Canonical status enum, includes CUSTOMS_CLEARANCE
+│   ├── chat/                Customer chat + admin inbox access layer
+│   ├── organizations/       Provisioning + organization list access layer
+│   ├── platform/            isPlatformOwner()
+│   ├── shipments/           createShipment, addTrackingEvent, and so on.
+│   └── validation/          Shared ValidationError, shipment + organization rules
+└── types/                   shipment.ts (status enum), organization.ts, chat.ts
 ```
 
 ## How the pieces fit together
 
-- One backend, four interfaces. The website, dashboard, and Telegram bot
-  all read and write the same `shipments` and `tracking_events` tables
-  through the same `lib/shipments/*` functions. Nothing is duplicated
-  per interface.
-- Two authentication paths, one set of functions. Dashboard writes
-  authenticate through the admin's browser session (cookies). The
-  Telegram webhook has no session. It verifies the Telegram user against
-  `telegram_accounts`, then calls the same `createShipment` and
-  `addTrackingEvent` functions with an explicit service role client and
-  resolved admin ID. See `lib/shipments/context.ts`.
-- The only service role key usage in this app is inside `lib/telegram/*`
-  and the webhook route. It bypasses RLS, so authorization is enforced
-  in code (`resolveAdminForTelegramUser`) before any shipment operation,
-  not by the database.
-- Account linking is entirely self service: a short lived, single use
-  token generated from Settings, redeemed through a Telegram deep link,
-  with an explicit confirm tap in the bot before the link is finalized.
-- Conversation state for guided bot flows lives in Postgres
-  (`telegram_sessions`), not server memory, and expires after 30
-  minutes. See `lib/telegram/session.ts`.
+- One backend, two interfaces. The public website and the admin
+  dashboard read and write the same `shipments` and `tracking_events`
+  tables through the same `lib/shipments/*` functions. Nothing is
+  duplicated per interface.
+- One authentication path. Dashboard writes authenticate through the
+  admin's browser session (cookies); there is no second credential
+  type in the application.
+- Tenant isolation lives in the database. RLS resolves the caller's
+  organization with `auth_organization_id()`; the browser never supplies
+  an organization ID, and a user in more than one organization always
+  gets the same deterministic one (their oldest membership). The
+  service-role client (`lib/supabase/service.ts`) bypasses RLS and is
+  used by exactly one request path — creating/looking up the Supabase
+  Auth user during organization provisioning, after authorization has
+  already been checked. It must never be used to read dashboard
+  business data or as a way around the organization boundary.
+- Platform access is a list, not a role hierarchy. `platform_owners`
+  (migration `0015`) decides who may provision organizations, is
+  invisible to every browser role, and is consulted only by
+  SECURITY DEFINER functions that take no arguments — so a customer
+  admin has no way to ask whether someone else is the operator, or to
+  reach organization creation at all.
+- Public reads go through SECURITY DEFINER functions
+  (`get_public_shipment`, `get_or_create_*_conversation`,
+  `send_customer_message`), so anonymous visitors never get table access
+  and the public contract stays structural rather than enforced by
+  every future policy change. Those same functions re-check tenancy for
+  signed-in callers (`0016`): a member of another organization is told
+  the conversation does not exist, while tracking-ID and anonymous
+  access behave exactly as the public pages expect.
 - Design tokens (color, type, spacing, radius, shadow) are centralized
   in `src/app/globals.css`. Brand strings and contact details are
   centralized in `src/lib/constants.ts`. Neither should be hard-coded
@@ -281,11 +456,15 @@ src/
 
 ## What's deliberately not built
 
-Customer Telegram accounts, WhatsApp or SMS, an AI conversational
-assistant, GPS hardware integration, automatic carrier APIs, payments,
-CRM, advanced analytics. All explicitly out of scope per the PRDs. The
-bot uses guided workflows and buttons throughout, not natural language
-understanding, on purpose.
+Customer WhatsApp or SMS, an AI conversational assistant, GPS hardware
+integration, automatic carrier APIs, payments, CRM, advanced analytics.
+All explicitly out of scope per the PRDs.
+
+Customer-facing multi-customer features — company onboarding, public
+signup, invitations, organization switching, billing, subscriptions,
+tenant branding — are future iterations. Organization provisioning for
+the operator exists (see "Provisioning"); everything a *customer* would
+do to manage their own company does not.
 
 Business facts that were never confirmed (company founding story,
 service coverage area, exact service list) remain clearly marked
@@ -294,10 +473,13 @@ content.
 
 ## Known limitations from this build session
 
-This code was written and built (lint and `next build` both pass) in a
-sandboxed environment that cannot reach `supabase.co` or
-`api.telegram.org`. Nothing here has been exercised against a live
-Telegram bot or a live database. Treat running through the setup steps
-above, then `/create`, `/track`, and `/update` in the bot, as the real
-verification step.
- 
+This code was written and built (lint and `next build` both pass).
+Migrations `0001`–`0013` were applied before this session; `0014`,
+`0015` and `0016` have since been applied to the live Supabase project
+and verified there — row counts and content checksums identical before
+and after, all function/privilege/storage audits green, and live RLS
+role tests (member, non-member, anonymous) passing with every
+transaction rolled back. What has *not* been exercised against the live
+database is the application itself: walk a shipment from creation to
+delivery through the dashboard, and create one organization through
+`/admin/organizations`, as the real end-to-end sign-off.

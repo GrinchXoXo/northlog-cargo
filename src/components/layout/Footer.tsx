@@ -48,16 +48,6 @@ export function Footer() {
                   {CONTACT.email}
                 </a>
               </li>
-              <li>
-                <a
-                  href={CONTACT.telegramHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-cargo"
-                >
-                  {CONTACT.telegramLabel}
-                </a>
-              </li>
             </ul>
           </div>
         </div>
