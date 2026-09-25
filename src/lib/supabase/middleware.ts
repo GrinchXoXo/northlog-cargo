@@ -31,9 +31,13 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isAdminRoute = request.nextUrl.pathname.startsWith("/admin");
-  const isLoginRoute = request.nextUrl.pathname === "/admin/login";
+  // Login and invitation acceptance arrive before (or without) a session
+  // cookie; redirecting them would strand the auth tokens in the URL.
+  const isPublicAdminRoute =
+    request.nextUrl.pathname === "/admin/login" ||
+    request.nextUrl.pathname === "/admin/accept-invite";
 
-  if (isAdminRoute && !isLoginRoute && !user) {
+  if (isAdminRoute && !isPublicAdminRoute && !user) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/admin/login";
     return NextResponse.redirect(redirectUrl);

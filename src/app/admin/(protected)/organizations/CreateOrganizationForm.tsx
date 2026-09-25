@@ -2,14 +2,15 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { CheckCircle2, Copy } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { createOrganizationAction } from "./actions";
 
 interface Created {
+  id: string;
   name: string;
   slug: string;
   adminEmail: string;
-  temporaryPassword: string | null;
+  invited: boolean;
 }
 
 export function CreateOrganizationForm() {
@@ -35,10 +36,11 @@ export function CreateOrganizationForm() {
       }
 
       setCreated({
+        id: result.organization.id,
         name: result.organization.name,
         slug: result.organization.slug,
         adminEmail: result.adminEmail,
-        temporaryPassword: result.temporaryPassword,
+        invited: result.invited,
       });
       setName("");
       setSlug("");
@@ -64,48 +66,35 @@ export function CreateOrganizationForm() {
               {created.name} created.
             </p>
             <p className="mt-1 text-sm text-slate">
-              Admin <span className="font-data text-xs text-ink">{created.adminEmail}</span>{" "}
-              can now sign in to /admin.
+              {created.invited ? (
+                <>
+                  An invitation email was sent to{" "}
+                  <span className="font-data text-xs text-ink">{created.adminEmail}</span>. They
+                  choose their own password from the link, then sign in at /admin.
+                </>
+              ) : (
+                <>
+                  Existing account{" "}
+                  <span className="font-data text-xs text-ink">{created.adminEmail}</span> was
+                  associated as owner — they can sign in at /admin with their current
+                  credentials. No invitation email was sent.
+                </>
+              )}
             </p>
           </div>
         </div>
 
-        <div className="rounded-[var(--radius-sm)] border border-hairline bg-surface-sunken p-4">
-          {created.temporaryPassword ? (
-            <>
-              <p className="font-data text-xs uppercase tracking-[0.1em] text-slate-light">
-                One-time password
-              </p>
-              <div className="mt-2 flex flex-wrap items-center gap-3">
-                <code className="font-data text-sm text-ink">{created.temporaryPassword}</code>
-                <button
-                  type="button"
-                  onClick={() => navigator.clipboard.writeText(created.temporaryPassword ?? "")}
-                  className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-hairline bg-surface px-2.5 py-1.5 text-xs font-medium text-ink hover:bg-surface-sunken"
-                >
-                  <Copy size={13} />
-                  Copy
-                </button>
-              </div>
-              <p className="mt-2 text-xs text-slate">
-                Give this to the admin once and have them change it. It is shown only here and
-                is not stored anywhere in this application.
-              </p>
-            </>
-          ) : (
-            <p className="text-xs text-slate">
-              An existing Supabase Auth account was associated with this organization, so no
-              new password was created. Use Supabase → Authentication → Users → Reset password
-              if the admin needs a new one.
-            </p>
-          )}
-        </div>
-
         <div className="flex flex-col gap-3 sm:flex-row">
+          <Link
+            href={`/admin/organizations/${created.id}`}
+            className="inline-flex items-center justify-center rounded-[var(--radius-sm)] bg-signal px-4 py-3 text-sm font-medium text-white hover:bg-signal-hover"
+          >
+            Open organization
+          </Link>
           <button
             type="button"
             onClick={() => setCreated(null)}
-            className="inline-flex items-center justify-center rounded-[var(--radius-sm)] bg-signal px-4 py-3 text-sm font-medium text-white hover:bg-signal-hover"
+            className="inline-flex items-center justify-center rounded-[var(--radius-sm)] border border-hairline px-4 py-3 text-sm font-medium text-ink hover:bg-surface-sunken"
           >
             Create another organization
           </button>

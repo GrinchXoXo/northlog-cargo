@@ -112,8 +112,9 @@ dashboard: every query is filtered by organization membership.
 Once `0015` is applied, later companies are created from the dashboard
 by the platform operator: sign in, open **Organizations**, enter the
 company name, its slug and the first admin's email address. The admin
-account is created for them together with a one-time password (shown
-once), so the SQL above is only for bootstrapping that first user.
+account is created for them and emailed a one-time invitation link
+landing on `/admin/accept-invite`, where they choose their own password,
+so the SQL above is only for bootstrapping that first user.
 
 ### 5. Run the app
 
@@ -207,8 +208,11 @@ operator → company name + slug + admin email
 - **Auth users:** created with the service-role key, strictly inside
   the server action (`src/lib/organizations/provision.ts`). The key is
   read from `SUPABASE_SERVICE_ROLE_KEY`, never sent to the browser and
-  never `NEXT_PUBLIC_`. A one-time password is generated with the
-  platform CSPRNG and shown to the operator once; nothing is stored.
+  never `NEXT_PUBLIC_`. No password is ever generated: Supabase Auth
+  creates the user in an invited state and emails a one-time link whose
+  `redirectTo` is `<NEXT_PUBLIC_SITE_URL>/admin/accept-invite`
+  (`inviteRedirectUrl()` in `provision.ts`), and the admin sets their own
+  password on that page.
 
 - **Partial failure is reported, never hidden:** the Auth user is
   created first on purpose. If the organization transaction then fails,
@@ -333,6 +337,17 @@ NEXT_PUBLIC_SITE_URL=https://northlog.xyz
 Next.js prefers this file during production builds automatically, so
 `npm run deploy` picks up the real domain without touching
 `.env.local`.
+
+Supabase Auth independently refuses to honor a redirect it has not been
+told about, so also add the invitation landing page to **Dashboard →
+Authentication → URL Configuration → Redirect URLs**:
+
+```
+https://northlog.xyz/admin/accept-invite
+```
+
+Without that entry the invitation email's `redirectTo` is rejected and
+the admin never reaches the accept page.
 
 ### 4. Deploy
 

@@ -1,4 +1,5 @@
 import type { PostgrestError } from "@supabase/supabase-js";
+import { SITE_URL } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service";
 import { ValidationError } from "@/lib/validation/error";
@@ -10,8 +11,13 @@ export type ProvisionOrganizationResult =
       ok: true;
       organization: ProvisionedOrganization;
       adminEmail: string;
-      /** One-time password for a newly created Auth user, or null when an existing user was associated. */
-      temporaryPassword: string | null;
+      /**
+       * True when a new Auth user was created and sent an invitation
+       * email (they set their own password when accepting). False when
+       * an existing Auth user was associated instead — no email is sent
+       * and they sign in with their existing credentials.
+       */
+      invited: boolean;
     }
   | {
       ok: false;
@@ -20,32 +26,17 @@ export type ProvisionOrganizationResult =
       partialAuthUserCreated?: boolean;
     };
 
-const PASSWORD_ALPHABET = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-// Rejection sampling bound: only accept the first 224 byte values so
-// every character is exactly equally likely (256 % 56 !== 0).
-const PASSWORD_BYTE_LIMIT = 256 - (256 % PASSWORD_ALPHABET.length);
-const PASSWORD_LENGTH = 16;
-
 /**
- * One-time password for a newly provisioned admin, generated with the
- * platform CSPRNG so no secret is ever derived from a timestamp, a
- * counter, or anything else an attacker can predict. Shown to the
- * operator exactly once; it is never stored in this application.
+ * Where Supabase Auth sends the admin after they click the invitation
+ * link. The accept page exchanges the session tokens from the URL and
+ * prompts for a new password; never a token, password, or secret.
  */
-export function generateTemporaryPassword(length = PASSWORD_LENGTH): string {
-  const bytes = new Uint8Array(length);
-  let out = "";
-
-  while (out.length < length) {
-    crypto.getRandomValues(bytes);
-    for (const byte of bytes) {
-      if (byte >= PASSWORD_BYTE_LIMIT) continue;
-      out += PASSWORD_ALPHABET[byte % PASSWORD_ALPHABET.length];
-      if (out.length === length) break;
-    }
-  }
-
-  return out;
+function inviteRedirectUrl(): string {
+  // SITE_URL already reads NEXT_PUBLIC_SITE_URL and falls back to the
+  // production domain, so the invitation link always has a home — never
+  // undefined, which would silently fall back to whatever Supabase Auth
+  // has configured as its own Site URL.
+  return `${SITE_URL.replace(/\/+$/, "")}/admin/accept-invite`;
 }
 
 /**
@@ -65,7 +56,8 @@ function describeRpcError(error: PostgrestError): string {
  * Provisions a new organization together with its first admin.
  *
  * Order of operations is deliberate (see migration 0015): validate,
- * authorize, then create the Supabase Auth user, and only then run the
+ * authorize, then invite the admin into Supabase Auth (invitation email
+ * only — this code never sees or sets a password), and only then run the
  * single transaction that inserts the organization and its OWNER
  * membership. The Auth user cannot participate in that transaction, so
  * if the last step fails the result says exactly that — an Auth user
@@ -151,7 +143,7 @@ export async function provisionOrganization(
   }
 
   let adminUserId = existingUserId as string | null;
-  let temporaryPassword: string | null = null;
+  let invited = false;
   let createdAuthUser = false;
 
   if (adminUserId) {
@@ -174,23 +166,24 @@ export async function provisionOrganization(
       };
     }
   } else {
-    temporaryPassword = generateTemporaryPassword();
+    // No plaintext password is ever generated here: Supabase Auth
+    // creates the user in an invited state and emails them a link; the
+    // admin chooses their own password on the accept page.
+    const { data: invitedUser, error: inviteError } = await service.auth.admin.inviteUserByEmail(
+      validated.adminEmail,
+      { redirectTo: inviteRedirectUrl() }
+    );
 
-    const { data: created, error: createError } = await service.auth.admin.createUser({
-      email: validated.adminEmail,
-      password: temporaryPassword,
-      email_confirm: true,
-    });
-
-    if (createError || !created.user?.id) {
-      console.error("auth.admin.createUser failed:", createError?.message ?? "no user returned");
+    if (inviteError || !invitedUser.user?.id) {
+      console.error("auth.admin.inviteUserByEmail failed:", inviteError?.message ?? "no user returned");
       return {
         ok: false,
-        error: "Could not create the Supabase Auth user for that email. Nothing was created.",
+        error: "Could not invite the Supabase Auth user for that email. Nothing was created.",
       };
     }
 
-    adminUserId = created.user.id;
+    adminUserId = invitedUser.user.id;
+    invited = true;
     createdAuthUser = true;
   }
 
@@ -241,7 +234,7 @@ export async function provisionOrganization(
             slug: organization.slug,
           },
           adminEmail: validated.adminEmail,
-          temporaryPassword,
+          invited,
         };
       }
 
@@ -289,6 +282,6 @@ export async function provisionOrganization(
     ok: true,
     organization: { id: organization.id, name: organization.name, slug: organization.slug },
     adminEmail: validated.adminEmail,
-    temporaryPassword,
+    invited,
   };
 }
